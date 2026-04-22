@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import { AppProvider } from './context/AppContext';
 import MainLayout from './components/MainLayout';
+import PingService from './components/PingService';
 
 export default function App() {
   useEffect(() => {
@@ -19,6 +20,7 @@ export default function App() {
   return (
     <AppProvider>
       <MainLayout />
+      <PingService />
     </AppProvider>
   );
 }

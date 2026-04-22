@@ -23,6 +23,7 @@ const defaultKeys: ApiKeys = {
   gemini: '',
   groq: '',
   preferredEngine: 'auto',
+  renderUrl: '',
   supabaseUrl: '',
   supabaseKey: '',
   mongoDbUrl: '',

@@ -10,6 +10,7 @@ export interface ApiKeys {
   gemini: string;
   groq: string;
   preferredEngine?: 'auto' | 'groq' | 'gemini';
+  renderUrl: string;
   supabaseUrl: string;
   supabaseKey: string;
   mongoDbUrl: string;

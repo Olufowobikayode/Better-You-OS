@@ -158,6 +158,22 @@ export default function Setup() {
                 placeholder="gsk_..."
               />
             </div>
+
+            <div className="pt-2">
+              <label className="block text-sm font-semibold text-blue-400 mb-1 flex items-center justify-between">
+                Render Persistence (Keep-Alive)
+                <span className="text-[10px] bg-blue-500/10 px-2 py-0.5 rounded text-blue-300 animate-pulse">5m Loop Active</span>
+              </label>
+              <input
+                type="text"
+                name="renderUrl"
+                value={localKeys.renderUrl}
+                onChange={handleChange}
+                className="w-full bg-gray-950 border border-blue-900/30 rounded-lg px-4 py-2 text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                placeholder="https://your-app.onrender.com"
+              />
+              <p className="text-[10px] text-gray-500 mt-1 italic">Providing your public Render URL enables a hard-ping loop to prevent container sleep.</p>
+            </div>
           </div>
 
           <div className="space-y-4">
