@@ -145,12 +145,22 @@ export default function TelegramEngine() {
   };
 
   const callGeminiReasoning = async (systemPrompt: string, userPrompt: string, isJson: boolean = false, filePart: any = null) => {
+    const pref = apiKeys.preferredEngine || 'auto';
+    const forceGroq = pref === 'groq';
+    const forceGemini = pref === 'gemini';
+
     if (!apiKeys.gemini && !apiKeys.groq) throw new Error("API keys explicitly missing for Reasoning Engine");
     
-    const cacheKey = `gemini_${systemPrompt}_${userPrompt}_${isJson}`;
+    // If Groq is preferred and available, skip Gemini entirely
+    if (forceGroq && apiKeys.groq) {
+      console.log("Forcing Groq Reasoning based on user preference.");
+      return await callGroqReasoningFallback(systemPrompt, userPrompt, isJson, filePart);
+    }
+
+    const cacheKey = `reasoning_${systemPrompt}_${userPrompt}_${isJson}`;
     const cached = await getCachedResponse(cacheKey);
     if (cached) {
-      console.log("Using LangChain cached response to save Gemini quota.");
+      console.log("Using cached response to save API calls.");
       return cached;
     }
 
@@ -179,7 +189,7 @@ export default function TelegramEngine() {
       }
 
       const res = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash',
         contents: contents,
         config: { 
           systemInstruction: systemPrompt,
@@ -191,7 +201,10 @@ export default function TelegramEngine() {
       return result;
     } catch (e: any) {
       const errMsg = e.message || "";
-      if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('API key not valid') || !apiKeys.gemini) {
+      // If user strictly requested Gemini and it fails, don't fallback to Groq automatically if they want silence/error
+      if (forceGemini) throw e;
+
+      if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('API key not valid') || errMsg.includes('suspended') || !apiKeys.gemini) {
         console.warn(`Gemini Reasoning unavailable (${errMsg}). Falling back to Groq Highest Reasoning Model.`);
         return await callGroqReasoningFallback(systemPrompt, userPrompt, isJson, filePart);
       }
@@ -484,7 +497,7 @@ Output ONLY the thought without any tags. Do not put <think> tags in final outpu
                     addLog('soul', 'receive', `Received from User: "${textContent}"`);
                   }
                   
-                  addLog('soul', 'process', 'Gemini (Reasoning Mode): Analyzing multimodal input, emotion, traits, and intent...');
+                  addLog('soul', 'process', 'AI Engine (Reasoning Mode): Analyzing input, emotion, traits, and intent...');
                   
                   const systemInstruction = `${MASTER_PROMPT}\n\n---
 You are currently operating as the SOUL BOT (Private Training Core).
@@ -645,7 +658,7 @@ Format:
                   const mappedTrait = emotionalStateRef.current?.mappedTrait || 'Unknown';
                   const zodiac = apiKeys.zodiacSign || 'Unknown';
                   
-                  addLog('public', 'process', 'Gemini (Reasoning Mode): Determining internal thought & checking for image requests...');
+                  addLog('public', 'process', 'AI Engine (Reasoning Mode): Determining internal thought & checking for image requests...');
                   
                   const reasoningInstruction = `${MASTER_PROMPT}\n\n---
 You are in REASONING MODE.
@@ -674,24 +687,30 @@ If they are NOT asking for a photo, output ONLY your internal thought.`;
 
                   if (internalThought.includes('IMAGE_REQUEST:')) {
                     const imagePrompt = internalThought.split('IMAGE_REQUEST:')[1].trim();
-                    addLog('public', 'process', `Gemini Imagen: Generating requested photo based on prompt: "${imagePrompt}"`);
+                    const pref = apiKeys.preferredEngine || 'auto';
                     
-                    try {
-                      const ai = new GoogleGenAI({ apiKey: apiKeys.gemini });
-                      const imgRes = await ai.models.generateImages({
-                        model: 'imagen-3.0-generate-002',
-                        prompt: imagePrompt,
-                        config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
-                      });
+                    if (pref === 'groq' || !apiKeys.gemini) {
+                      addLog('public', 'process', 'Image request detected, but skipping Gemini Imagen based on preference/missing key.');
+                    } else {
+                      addLog('public', 'process', `AI Engine: Generating requested photo based on prompt: "${imagePrompt}"`);
+                      
+                      try {
+                        const ai = new GoogleGenAI({ apiKey: apiKeys.gemini });
+                        const imgRes = await ai.models.generateImages({
+                          model: 'imagen-3.0-generate-002',
+                          prompt: imagePrompt,
+                          config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
+                        });
 
-                      if (imgRes.generatedImages && imgRes.generatedImages.length > 0) {
-                        const base64Image = imgRes.generatedImages[0].image.imageBytes;
-                        await sendTelegramPhoto(apiKeys.telegramPublic, chatId, base64Image);
-                        addLog('public', 'send', `Sent generated photo to ${senderName}.`);
-                        return; // Exit queue item early
+                        if (imgRes.generatedImages && imgRes.generatedImages.length > 0) {
+                          const base64Image = imgRes.generatedImages[0].image.imageBytes;
+                          await sendTelegramPhoto(apiKeys.telegramPublic, chatId, base64Image);
+                          addLog('public', 'send', `Sent generated photo to ${senderName}.`);
+                          return; // Exit queue item early
+                        }
+                      } catch (err: any) {
+                        addLog('public', 'error', `Image generation failed: ${err.message}`);
                       }
-                    } catch (err: any) {
-                      addLog('public', 'error', `Image generation failed: ${err.message}`);
                     }
                   }
 
